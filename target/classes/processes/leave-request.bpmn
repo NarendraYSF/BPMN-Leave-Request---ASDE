@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  id="Definitions_LeaveRequest"
+                  targetNamespace="http://bpmn.io/schema/bpmn"
+                  exporter="Camunda Modeler"
+                  exporterVersion="5.20.0">
+
+  <bpmn:process id="leave-request-process" name="Sistem Pengajuan Cuti Mahasiswa" isExecutable="true" camunda:historyTimeToLive="180">
+    
+    <!-- 1. Start Event -->
+    <bpmn:startEvent id="StartEvent_1" name="Permohonan Cuti Dimulai">
+      <bpmn:outgoing>Flow_Start_To_Submit</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <!-- 2. User Task: Mahasiswa Mengajukan Permohonan Cuti -->
+    <bpmn:userTask id="submitRequestTask" name="Submit Permohonan Cuti (Mahasiswa)"
+                   camunda:assignee="mahasiswa"
+                   camunda:candidateGroups="mahasiswa">
+      <bpmn:documentation>Mahasiswa mengisi dan mengajukan formulir permohonan cuti akademik.</bpmn:documentation>
+      <bpmn:incoming>Flow_Start_To_Submit</bpmn:incoming>
+      <bpmn:outgoing>Flow_Submit_To_Validate</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 3. Service Task: Validasi Permohonan Cuti -->
+    <bpmn:serviceTask id="validateRequestTask" name="Validasi Permohonan"
+                      camunda:delegateExpression="${validateRequestDelegate}">
+      <bpmn:documentation>Sistem melakukan validasi kelayakan data permohonan cuti mahasiswa.</bpmn:documentation>
+      <bpmn:incoming>Flow_Submit_To_Validate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validate_To_Advisor</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- 4. User Task: Review Dosen Pembimbing -->
+    <bpmn:userTask id="advisorReviewTask" name="Review Dosen Pembimbing"
+                   camunda:assignee="dosen_pembimbing"
+                   camunda:candidateGroups="dosen">
+      <bpmn:documentation>Dosen Pembimbing Akademik memeriksa dan memberikan rekomendasi persetujuan atau penolakan.</bpmn:documentation>
+      <bpmn:incoming>Flow_Validate_To_Advisor</bpmn:incoming>
+      <bpmn:outgoing>Flow_Advisor_To_Gateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 5. Exclusive Gateway: Keputusan Dosen Pembimbing -->
+    <bpmn:exclusiveGateway id="advisorDecisionGateway" name="Keputusan Dosen Pembimbing?">
+      <bpmn:incoming>Flow_Advisor_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Advisor_Approved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Advisor_Rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- 6. Service Task: Notifikasi Mahasiswa jika Ditolak Dosen -->
+    <bpmn:serviceTask id="notifyAdvisorRejectedTask" name="Notifikasi Mahasiswa (Ditolak Dosen)"
+                      camunda:delegateExpression="${notifyStudentDelegate}">
+      <bpmn:documentation>Mengirimkan notifikasi penolakan dari Dosen Pembimbing kepada mahasiswa.</bpmn:documentation>
+      <bpmn:incoming>Flow_Advisor_Rejected</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyAdvisor_To_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- End Event: Ditolak Dosen -->
+    <bpmn:endEvent id="endEventAdvisorRejected" name="Selesai (Ditolak Dosen)">
+      <bpmn:incoming>Flow_NotifyAdvisor_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- 7. User Task: Review Ketua Program Studi -->
+    <bpmn:userTask id="kaprodiReviewTask" name="Review Ketua Program Studi"
+                   camunda:assignee="ketua_prodi"
+                   camunda:candidateGroups="kaprodi">
+      <bpmn:documentation>Ketua Program Studi memeriksa permohonan yang telah disetujui Dosen Pembimbing untuk keputusan final.</bpmn:documentation>
+      <bpmn:incoming>Flow_Advisor_Approved</bpmn:incoming>
+      <bpmn:outgoing>Flow_Kaprodi_To_Gateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 8. Exclusive Gateway: Keputusan Ketua Prodi -->
+    <bpmn:exclusiveGateway id="kaprodiDecisionGateway" name="Keputusan Ketua Prodi?">
+      <bpmn:incoming>Flow_Kaprodi_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Kaprodi_Approved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Kaprodi_Rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- 9. Service Task: Notifikasi Mahasiswa jika Ditolak Kaprodi -->
+    <bpmn:serviceTask id="notifyKaprodiRejectedTask" name="Notifikasi Mahasiswa (Ditolak Kaprodi)"
+                      camunda:delegateExpression="${notifyStudentDelegate}">
+      <bpmn:documentation>Mengirimkan notifikasi penolakan dari Ketua Program Studi kepada mahasiswa.</bpmn:documentation>
+      <bpmn:incoming>Flow_Kaprodi_Rejected</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyKaprodi_To_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- End Event: Ditolak Kaprodi -->
+    <bpmn:endEvent id="endEventKaprodiRejected" name="Selesai (Ditolak Kaprodi)">
+      <bpmn:incoming>Flow_NotifyKaprodi_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- 10. Service Task: Notifikasi Mahasiswa jika Disetujui Penuh -->
+    <bpmn:serviceTask id="notifyApprovedTask" name="Notifikasi Mahasiswa (Disetujui)"
+                      camunda:delegateExpression="${notifyStudentDelegate}">
+      <bpmn:documentation>Mengirimkan notifikasi persetujuan cuti akademik kepada mahasiswa.</bpmn:documentation>
+      <bpmn:incoming>Flow_Kaprodi_Approved</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyApproved_To_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <!-- End Event: Disetujui -->
+    <bpmn:endEvent id="endEventApproved" name="Selesai (Cuti Disetujui)">
+      <bpmn:incoming>Flow_NotifyApproved_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- Sequence Flows (Koneksi Alur Proses) -->
+    <bpmn:sequenceFlow id="Flow_Start_To_Submit" sourceRef="StartEvent_1" targetRef="submitRequestTask" />
+    <bpmn:sequenceFlow id="Flow_Submit_To_Validate" sourceRef="submitRequestTask" targetRef="validateRequestTask" />
+    <bpmn:sequenceFlow id="Flow_Validate_To_Advisor" sourceRef="validateRequestTask" targetRef="advisorReviewTask" />
+    <bpmn:sequenceFlow id="Flow_Advisor_To_Gateway" sourceRef="advisorReviewTask" targetRef="advisorDecisionGateway" />
+
+    <bpmn:sequenceFlow id="Flow_Advisor_Approved" name="Disetujui Dosen" sourceRef="advisorDecisionGateway" targetRef="kaprodiReviewTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${advisorApproved == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="Flow_Advisor_Rejected" name="Ditolak Dosen" sourceRef="advisorDecisionGateway" targetRef="notifyAdvisorRejectedTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${advisorApproved == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="Flow_NotifyAdvisor_To_End" sourceRef="notifyAdvisorRejectedTask" targetRef="endEventAdvisorRejected" />
+
+    <bpmn:sequenceFlow id="Flow_Kaprodi_To_Gateway" sourceRef="kaprodiReviewTask" targetRef="kaprodiDecisionGateway" />
+
+    <bpmn:sequenceFlow id="Flow_Kaprodi_Approved" name="Disetujui Kaprodi" sourceRef="kaprodiDecisionGateway" targetRef="notifyApprovedTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${kaprodiApproved == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="Flow_Kaprodi_Rejected" name="Ditolak Kaprodi" sourceRef="kaprodiDecisionGateway" targetRef="notifyKaprodiRejectedTask">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${kaprodiApproved == false}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="Flow_NotifyKaprodi_To_End" sourceRef="notifyKaprodiRejectedTask" targetRef="endEventKaprodiRejected" />
+    <bpmn:sequenceFlow id="Flow_NotifyApproved_To_End" sourceRef="notifyApprovedTask" targetRef="endEventApproved" />
+
+  </bpmn:process>
+
+  <!-- BPMN Diagram Layout -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_LeaveRequest">
+    <bpmndi:BPMNPlane id="BPMNPlane_LeaveRequest" bpmnElement="leave-request-process">
+      
+      <!-- Start Event -->
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_1" bpmnElement="StartEvent_1">
+        <dc:Bounds x="160" y="112" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="138" y="155" width="82" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Submit Request Task -->
+      <bpmndi:BPMNShape id="Activity_Submit_di" bpmnElement="submitRequestTask">
+        <dc:Bounds x="250" y="90" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <!-- Validate Request Task -->
+      <bpmndi:BPMNShape id="Activity_Validate_di" bpmnElement="validateRequestTask">
+        <dc:Bounds x="430" y="90" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <!-- Advisor Review Task -->
+      <bpmndi:BPMNShape id="Activity_Advisor_di" bpmnElement="advisorReviewTask">
+        <dc:Bounds x="610" y="90" width="140" height="80" />
+      </bpmndi:BPMNShape>
+
+      <!-- Advisor Decision Gateway -->
+      <bpmndi:BPMNShape id="Gateway_Advisor_di" bpmnElement="advisorDecisionGateway" isMarkerVisible="true">
+        <dc:Bounds x="800" y="105" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="782" y="70" width="86" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Notify Advisor Rejected -->
+      <bpmndi:BPMNShape id="Activity_NotifyAdvisorRejected_di" bpmnElement="notifyAdvisorRejectedTask">
+        <dc:Bounds x="760" y="240" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <!-- End Advisor Rejected -->
+      <bpmndi:BPMNShape id="Event_AdvisorRejected_di" bpmnElement="endEventAdvisorRejected">
+        <dc:Bounds x="807" y="372" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="786" y="415" width="79" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Kaprodi Review Task -->
+      <bpmndi:BPMNShape id="Activity_Kaprodi_di" bpmnElement="kaprodiReviewTask">
+        <dc:Bounds x="920" y="90" width="140" height="80" />
+      </bpmndi:BPMNShape>
+
+      <!-- Kaprodi Decision Gateway -->
+      <bpmndi:BPMNShape id="Gateway_Kaprodi_di" bpmnElement="kaprodiDecisionGateway" isMarkerVisible="true">
+        <dc:Bounds x="1120" y="105" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1102" y="70" width="86" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Notify Kaprodi Rejected -->
+      <bpmndi:BPMNShape id="Activity_NotifyKaprodiRejected_di" bpmnElement="notifyKaprodiRejectedTask">
+        <dc:Bounds x="1080" y="240" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <!-- End Kaprodi Rejected -->
+      <bpmndi:BPMNShape id="Event_KaprodiRejected_di" bpmnElement="endEventKaprodiRejected">
+        <dc:Bounds x="1127" y="372" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1106" y="415" width="79" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Notify Approved -->
+      <bpmndi:BPMNShape id="Activity_NotifyApproved_di" bpmnElement="notifyApprovedTask">
+        <dc:Bounds x="1240" y="90" width="130" height="80" />
+      </bpmndi:BPMNShape>
+
+      <!-- End Approved -->
+      <bpmndi:BPMNShape id="Event_Approved_di" bpmnElement="endEventApproved">
+        <dc:Bounds x="1432" y="112" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1411" y="155" width="79" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- Edges / Sequence Flows -->
+      <bpmndi:BPMNEdge id="Flow_Start_To_Submit_di" bpmnElement="Flow_Start_To_Submit">
+        <di:waypoint x="196" y="130" />
+        <di:waypoint x="250" y="130" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Submit_To_Validate_di" bpmnElement="Flow_Submit_To_Validate">
+        <di:waypoint x="380" y="130" />
+        <di:waypoint x="430" y="130" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Validate_To_Advisor_di" bpmnElement="Flow_Validate_To_Advisor">
+        <di:waypoint x="560" y="130" />
+        <di:waypoint x="610" y="130" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Advisor_To_Gateway_di" bpmnElement="Flow_Advisor_To_Gateway">
+        <di:waypoint x="750" y="130" />
+        <di:waypoint x="800" y="130" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Advisor_Approved_di" bpmnElement="Flow_Advisor_Approved">
+        <di:waypoint x="850" y="130" />
+        <di:waypoint x="920" y="130" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="847" y="112" width="77" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Advisor_Rejected_di" bpmnElement="Flow_Advisor_Rejected">
+        <di:waypoint x="825" y="155" />
+        <di:waypoint x="825" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="831" y="195" width="68" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_NotifyAdvisor_To_End_di" bpmnElement="Flow_NotifyAdvisor_To_End">
+        <di:waypoint x="825" y="320" />
+        <di:waypoint x="825" y="372" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Kaprodi_To_Gateway_di" bpmnElement="Flow_Kaprodi_To_Gateway">
+        <di:waypoint x="1060" y="130" />
+        <di:waypoint x="1120" y="130" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Kaprodi_Approved_di" bpmnElement="Flow_Kaprodi_Approved">
+        <di:waypoint x="1170" y="130" />
+        <di:waypoint x="1240" y="130" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1165" y="112" width="82" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_Kaprodi_Rejected_di" bpmnElement="Flow_Kaprodi_Rejected">
+        <di:waypoint x="1145" y="155" />
+        <di:waypoint x="1145" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1151" y="195" width="73" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_NotifyKaprodi_To_End_di" bpmnElement="Flow_NotifyKaprodi_To_End">
+        <di:waypoint x="1145" y="320" />
+        <di:waypoint x="1145" y="372" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_NotifyApproved_To_End_di" bpmnElement="Flow_NotifyApproved_To_End">
+        <di:waypoint x="1370" y="130" />
+        <di:waypoint x="1432" y="130" />
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

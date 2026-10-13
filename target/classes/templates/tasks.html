@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inbox Persetujuan Tugas BPMN - Sistem Cuti</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card-custom { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: none; }
+        .badge-role { font-size: 0.8rem; padding: 5px 10px; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+<!-- Navigation Bar -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+    <div class="container">
+        <a class="navbar-brand fw-bold" href="/">
+            <i class="bi bi-diagram-3-fill text-warning me-2"></i>BPMN Leave System
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="/"><i class="bi bi-pencil-square me-1"></i>Form Pengajuan</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="/tasks"><i class="bi bi-inbox-fill me-1"></i>Inbox Persetujuan</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/requests"><i class="bi bi-list-check me-1"></i>Monitoring Status</a>
+                </li>
+            </ul>
+            <div class="d-flex gap-2">
+                <a href="/camunda/app/" target="_blank" class="btn btn-warning btn-sm">
+                    <i class="bi bi-speedometer2 me-1"></i>Camunda Cockpit
+                </a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1"><i class="bi bi-inbox-fill text-primary me-2"></i>Daftar Tugas Persetujuan (Task Inbox)</h3>
+            <p class="text-muted small mb-0">Antrean User Task dari Camunda BPMN Engine yang menunggu verifikasi Dosen Pembimbing atau Ketua Program Studi.</p>
+        </div>
+        <div>
+            <a href="/tasks" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Segarkan</a>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i><span th:text="${successMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i><span th:text="${errorMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Empty State -->
+    <div th:if="${tasks.empty}" class="card card-custom p-5 text-center bg-white">
+        <div class="py-4">
+            <i class="bi bi-clipboard-check display-3 text-success mb-3"></i>
+            <h4 class="fw-bold">Tidak Ada Tugas yang Menunggu!</h4>
+            <p class="text-muted">Semua permohonan cuti telah diproses atau belum ada mahasiswa yang mengajukan cuti.</p>
+            <a href="/" class="btn btn-primary mt-2"><i class="bi bi-plus-circle me-1"></i>Buat Pengajuan Baru</a>
+        </div>
+    </div>
+
+    <!-- Task List Cards -->
+    <div th:unless="${tasks.empty}" class="row g-4">
+        <div th:each="task : ${tasks}" class="col-lg-6">
+            <div class="card card-custom h-100 bg-white">
+                <div class="card-header bg-light border-bottom d-flex justify-content-between align-items-center py-3">
+                    <div>
+                        <span th:if="${task.taskDefinitionKey == 'advisorReviewTask'}" class="badge bg-primary badge-role">
+                            <i class="bi bi-person-badge me-1"></i>Review Dosen Pembimbing
+                        </span>
+                        <span th:if="${task.taskDefinitionKey == 'kaprodiReviewTask'}" class="badge bg-purple badge-role" style="background-color: #6f42c1; color: white;">
+                            <i class="bi bi-award-fill me-1"></i>Review Ketua Program Studi
+                        </span>
+                        <span th:if="${task.taskDefinitionKey != 'advisorReviewTask' and task.taskDefinitionKey != 'kaprodiReviewTask'}" class="badge bg-secondary badge-role" th:text="${task.taskName}">
+                        </span>
+                    </div>
+                    <small class="text-muted">
+                        <i class="bi bi-clock me-1"></i><span th:text="${#dates.format(task.createTime, 'dd MMM yyyy HH:mm')}"></span>
+                    </small>
+                </div>
+
+                <div class="card-body">
+                    <h5 class="card-title fw-bold text-dark mb-3">
+                        <span th:text="${task.studentName != null ? task.studentName : 'Mahasiswa'}">Nama Mahasiswa</span>
+                        <span class="text-muted fs-6 fw-normal" th:text="'(NIM: ' + (${task.nim != null ? task.nim : '-'}) + ')'"></span>
+                    </h5>
+
+                    <ul class="list-group list-group-flush mb-4 small">
+                        <li class="list-group-item px-0 d-flex justify-content-between">
+                            <span class="text-muted">Periode Cuti:</span>
+                            <span class="fw-semibold" th:text="(${task.startDate != null ? task.startDate : '-'}) + ' s/d ' + (${task.endDate != null ? task.endDate : '-'})"></span>
+                        </li>
+                        <li class="list-group-item px-0 d-flex justify-content-between">
+                            <span class="text-muted">Status Saat Ini:</span>
+                            <span class="badge bg-info text-dark" th:text="${task.status != null ? task.status : 'DALAM_PROSES'}"></span>
+                        </li>
+                        <li class="list-group-item px-0">
+                            <div class="text-muted mb-1">Alasan Permohonan:</div>
+                            <div class="p-2 bg-light rounded text-secondary fst-italic" th:text="${task.reason != null ? task.reason : '-'}"></div>
+                        </li>
+                        <li class="list-group-item px-0 d-flex justify-content-between">
+                            <span class="text-muted">Task ID / Instance:</span>
+                            <span class="font-monospace small text-truncate" style="max-width: 220px;" th:text="${task.taskId}"></span>
+                        </li>
+                    </ul>
+
+                    <!-- Action Decision Form -->
+                    <form th:action="@{/tasks/{id}/complete(id=${task.taskId})}" method="post">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-secondary">Catatan / Alasan Evaluasi:</label>
+                            <input type="text" name="comment" class="form-control form-control-sm" placeholder="Tuliskan catatan persetujuan atau alasan penolakan...">
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="approved" value="true" class="btn btn-success flex-grow-1 shadow-sm">
+                                <i class="bi bi-check-lg me-1"></i>Setujui (Approve)
+                            </button>
+                            <button type="submit" name="approved" value="false" class="btn btn-danger flex-grow-1 shadow-sm">
+                                <i class="bi bi-x-lg me-1"></i>Tolak (Reject)
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="text-center py-4 text-muted border-top mt-5 bg-white small">
+    <div class="container">
+        <p class="mb-0"><strong>Camunda BPMN 2.0 Engine & Spring Boot 3</strong> — Alur Kerja Otomatis Cuti Mahasiswa</p>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
